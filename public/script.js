@@ -18,10 +18,10 @@ function addRuleForm(rule = null) {
             </select>
         </div>
         <div><label>Networks (comma-separated):</label><input type="text" name="networks"></div>
-        <div><label>Subject (JSON format):</label><textarea name="subject" rows="2"></textarea></div>
+        <div><label>Subject (JSON format):</label><input type="text" name="subject" rows="2"></textarea></div>
         <div><label>Methods (comma-separated):</label><input type="text" name="methods"></div>
         <div><label>Resources (comma-separated regexes):</label><input type="text" name="resources"></div>
-        <div><label>Query (JSON format):</label><textarea name="query" rows="2"></textarea></div>
+        <div><label>Query (JSON format):</label><input type="text" name="query" rows="2"></textarea></div>
         <button type="button" onclick="removeRuleForm(${ruleId})">Remove Rule</button>
     `;
     container.appendChild(ruleForm);
@@ -113,74 +113,126 @@ function importYAML() {
     } catch (err) {
         alert('Error parsing YAML: ' + err.message);
     }
+	saveAllFields();
 }
 
-// function fetchAndPopulateFields() {
-//     fetch('/getFields')
-//         .then(response => response.json())
-//         .then(data => {
-//             const fields = data.fields;
-//             document.querySelectorAll('input[type="text"]').forEach(input => {
-//                 const dropdown = document.createElement('select');
-//                 dropdown.innerHTML = `<option value="">Select or enter new...</option>`;
-//                 fields.forEach(field => {
-//                     if (field.fieldName === input.getAttribute('name')) {
-//                         const option = document.createElement('option');
-//                         option.value = field.fieldValue;
-//                         option.textContent = field.fieldValue;
-//                         dropdown.appendChild(option);
-//                     }
-//                 });
-//                 input.parentNode.insertBefore(dropdown, input.nextSibling);
-//                 dropdown.onchange = () => {
-//                     if (dropdown.value) {
-//                         input.value = dropdown.value;
-//                     }
-//                 };
-//             });
-//         });
-// }
+// function to save all fields
+function saveAllFields() {
+    document.querySelectorAll('input[type="text"]').forEach(input => {
+        const fieldName = input.name;
+        const fieldValue = input.value;
+        if (fieldValue) {
+            saveField(fieldName, fieldValue);
+        }
 
-// fetchAndPopulateFields();
+        // Create dropdown
+        const dropdown = document.createElement('select');
+        dropdown.style.display = 'none'; // Initially hide the dropdown
+        input.parentNode.appendChild(dropdown);
 
+        // Show dropdown when input is focused
+        input.addEventListener('focus', function() {
+            fetch('/getFields')
+                .then(response => response.json())
+                .then(data => {
+                    const fields = data.fields;
+                    dropdown.innerHTML = `<option value="">Select or enter new...</option>`;
+                    fields.forEach(field => {
+                        if (field.fieldName === fieldName) {
+                            const option = document.createElement('option');
+                            option.value = field.fieldValue;
+                            option.textContent = field.fieldValue;
+                            dropdown.appendChild(option);
+                        }
+                    });
+                    dropdown.style.display = 'block'; // Show the dropdown
+                });
+        });
 
-// function initializeSaveFieldButtons() {
-//     document.querySelectorAll('.saveFieldBtn').forEach(button => {
-//         button.addEventListener('click', function() {
-//             const input = this.previousElementSibling;
-//             const fieldName = input.name;
-//             const fieldValue = input.value;
-//             if (fieldValue) {
-//                 saveField(fieldName, fieldValue);
-//             } else {
-//                 alert("Please enter a value to save.");
-//             }
-//         });
-//     });
-// }
+        // Hide dropdown when input is blurred
+		input.addEventListener('blur', function(e) {
+			// Check if the relatedTarget is the dropdown or a child of the dropdown
+			if (e.relatedTarget !== dropdown && !dropdown.contains(e.relatedTarget)) {
+				dropdown.style.display = 'none'; // Hide the dropdown
+			}
+		});
 
-// function saveField(fieldName, fieldValue) {
-//     fetch('/saveField', {
-//         method: 'POST',
-//         headers: {
-//             'Content-Type': 'application/json',
-//         },
-//         body: JSON.stringify({ fieldName, fieldValue }),
-//     })
-//     .then(response => response.json())
-//     .then(data => {
-//         // Optionally, re-fetch fields to update dropdowns
-//         fetchAndPopulateFields();
-//         alert("Field value saved successfully.");
-//     })
-//     .catch(error => {
-//         console.error('Error saving field:', error);
-//         alert('Error saving field. Check console for details.');
-//     });
-// }
+        // Update input value when an option is selected from the dropdown
+        dropdown.addEventListener('change', function() {
+            if (dropdown.value) {
+                input.value = dropdown.value;
+            }
+        });
+    });
+}
 
+// function to save a single field
+function saveField(fieldName, fieldValue) {
+    // First, check if the field already exists
+    fetch('/getField', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fieldName, fieldValue }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.field) {
+            // If the field already exists, do not save it
+            console.log('Field already exists');
+        } else {
+            // If the field does not exist, save it
+            fetch('/saveField', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fieldName, fieldValue }),
+            })
+            .then(response => response.json())
+            .catch(error => console.error('Error:', error));
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
 
-document.getElementById('generateBtn').addEventListener('click', generateYAML);
+// function to fetch and populate fields
+function fetchAndPopulateFields() {
+    fetch('/getFields')
+        .then(response => response.json())
+        .then(data => {
+            const fields = data.fields;
+            document.querySelectorAll('input[type="text"]').forEach(input => {
+                const dropdown = document.createElement('select');
+                dropdown.innerHTML = `<option value="">Select or enter new...</option>`;
+                fields.forEach(field => {
+                    if (field.fieldName === input.getAttribute('name')) {
+                        const option = document.createElement('option');
+                        option.value = field.fieldValue;
+                        option.textContent = field.fieldValue;
+                        dropdown.appendChild(option);
+                    }
+                });
+                input.parentNode.insertBefore(dropdown, input.nextSibling);
+                dropdown.onchange = () => {
+                    if (dropdown.value) {
+                        input.value = dropdown.value;
+                    }
+                };
+            });
+        });
+}
+
+// Call fetchAndPopulateFields function
+fetchAndPopulateFields();
+
+// Call saveAllFields function when the YAML is generated
+// replace 'generateYaml' with the actual function that generates the YAML
+document.getElementById('generateBtn').addEventListener('click', function() {
+	// generateYaml(); // call the function that generates the YAML
+	saveAllFields(); // save all fields after generating the YAML
+});
 
 // Initialize with one rule form
 addRuleForm();
